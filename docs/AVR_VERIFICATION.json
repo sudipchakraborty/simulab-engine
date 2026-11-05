@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-05",
+  "emulator": "avr8js0.21.1",
+  "firmware": "blink-uart.hex",
+  "clockHz": 16000000,
+  "expectedToggleIntervalCycles": 4000000,
+  "observedTransitions": [
+    {
+      "pin": "D13",
+      "level": 1,
+      "cycle": 4000163
+    },
+    {
+      "pin": "D13",
+      "level": 0,
+      "cycle": 8000163
+    }
+  ],
+  "observedIntervalCycles": 4000000,
+  "serial": "SIMULAB AVR READY\nLED ON\nLED OFF\n",
+  "executedCycles": 9000000,
+  "hardwareComparison": "not performed",
+  "scope": "Register-derived timing reference only, not physical hardware measurement"
+}

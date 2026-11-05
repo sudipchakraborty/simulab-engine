@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.c -text whitespace=cr-at-eol
+*.hex -text whitespace=cr-at-eol
+*.elf binary
+*.map -whitespace
