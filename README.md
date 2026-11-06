@@ -1,26 +1,26 @@
-﻿# SimuLab engine
+# SimuLab engine
 
-Independent `@simulab/engine` 0.2.0 package, contract 1.0.0. Executes compiled ATmega328P instructions through pinned AVR8js0.21.1. No React, Node host APIs, Arduino source parser or mock execution is in runtime code. This initial adapter is TypeScript for the existing JavaScript emulator; Rust/WASM infrastructure is future work, not a requirement for executing this verified adapter.
+Framework-independent MCU adapters, version0.3.0. Existing UnoRuntime/AVR8js0.21.1 remains exported; the ESP32-S3 adapter injects official Espressif ESP Emulator0.51.0 JS/WASM. Runtime code has no React or Node host dependency.
 
-## Development (Windows11 / VS Code)
+## Develop on Windows11 / Node24
 
 ```powershell
 npm.cmd ci
 npm.cmd run build
 npm.cmd test
-npm.cmd pack
+node esp32/setup-assets.mjs
+npm.cmd run test:esp32
+npm.cmd run test:esp32:firmware
 ```
 
-`new UnoRuntime(hex)` validates Intel HEX. Call `start()`, then bounded `runCycles(160000)` slices from a Worker or native JS host. `pause/resume/stop/reset`, `setPin` and `snapshot` are documented in `docs/CONTRACTS.md`. Clock16MHz, flash32KiB, SRAM2KiB. Byte ordering is explicitly decoded from HEX.
+AVR fixtures are genuine AVR-GCC output in firmware/ with compiler/source/ELF/HEX hashes and local compiler scripts. S3 uses the official MicroPython1.29 generic S3 Octal-SPIRAM merged image, booted through actualS3 ROM/WASM; acquisition hashes and real UART/GPIO/timing/memory evidence are in esp32/.
 
-The package is distributed as a versioned npm tarball to the frontend; consumers never import this repository's source. Build and test before repacking. For this workspace run `npm.cmd pack --pack-destination ../simulab-frontend/vendor`, then install the resulting tarball from the frontend. Replacing an existing artifact requires reinstalling it and updating its lockfile integrity. Never publish/push without authorization.
+createMcuEngine({target:'atmega328p'}) or createMcuEngine({target:'esp32s3',bindings}) exposes common firmware/lifecycle/GPIO/UART subscriptions/time/capabilities. UnoRuntime remains source-compatible. AVR budgets count cycles; S3 budgets count instructions. Firmware and pins retain architecture-specific identities; incorrect types/targets throw rather than falling back.
 
-## Verification fixtures
+Package independently with npm.cmd pack. Frontend consumes the versioned tarball and hosts officialWASM/reference firmware assets itself; runtime never imports sibling repository source. Publish/commit/push/deploy only when authorized.
 
-`firmware/` contains C, ELF and Intel HEX outputs plus SHA256 provenance. `scripts/` provides reproducible local toolchain setup/build. See `firmware/README.md`. Tests execute actual compiled firmware: Timer1 interrupt-driven D13 and D12 toggles, UART TX output, input-register D2 to D11 mirroring, pause and deterministic reset. Timing is compared with the register-derived 4,000,000-cycle toggle interval. Physical hardware comparison has not been performed.
+## Compatibility limits
 
-## Limits
+Uno GPIO/Timer1/UART TX are verified; advanced AVR peripheral claims remain limited. S3 ROM/firmware boot, two reported harts, GPIO4 output/timer and GPIO5 input/UART are verified in the engine and browser. GPIO events are batch samples. RGB/WS2812/externalI2C/SPI hooks are unavailable. Reference firmware reports4MiB flash/~8.3MB free heap; fullN16R8 sizing cannot be selected through browser bindings. Physical hardware parity and analog accuracy are not claimed. Reset reloads originalflash and discards runtime filesystem changes.
 
-ATmega328P only; HEX only (no ELF loader). No board auto-detection from HEX. GPIO, Timer1 CTC/interrupts and UART TX are tested. Timer0/2 are configured but unverified. PWM, I2C, SPI, ADC, UART RX, EEPROM, watchdog, sleep, bootloader/fuses and Mega/ESP32 are unsupported or unverified. Unsupported opcodes/operations fail explicitly; there is no synthetic fallback. No analog solver or safety claim.
-
-Cycle budgets1..250000, serial and GPIO event batches4096 each, firmware ASCII text128KiB, flash32KiB. Errors have stable codes. Host must supply scheduling, enforce total session limits and terminate execution on errors. See THIRD_PARTY_NOTICES.md for upstream attribution; project distribution licensing is not yet selected.
+See docs/CONTRACTS.md, esp32/README.md, firmware/README.md and THIRD_PARTY_NOTICES.md. Asset acquisition stays in ignored local cache; runtime package excludes downloaded compiler/emulator cache files. Licensing/attribution is retained; project distribution license remains unselected.

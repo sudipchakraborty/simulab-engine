@@ -27,3 +27,7 @@ THE SOFTWARE.
 
 
 The AVR compiler is a development-only local download, excluded from this package/application. Review its separate GPL/binutils/avr-libc notices before redistribution. Fixtures and SimuLab code have no project distribution license selected yet.
+
+## Espressif emulator extension
+
+Espressif ESP Emulator0.51.0: https://github.com/espressif/esp-emulator . Official JS/WASM bundle is Apache-2.0; full notice is in esp32/licenses/ESP-EMU-LICENSE.txt. MicroPython1.29.0 reference firmware acquisition/source is recorded in esp32/asset-manifest.json; its license is in esp32/licenses/MICROPYTHON-LICENSE.txt. The merged image contains ESP-IDF and other upstream components; review the upstream binary/source dependency notices before commercial redistribution. No project-wide distribution license has been selected.

@@ -3,3 +3,4 @@ dist/
 *.tgz
 .toolchain/
 scripts/.toolchain/
+esp32/.cache/

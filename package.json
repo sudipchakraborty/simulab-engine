@@ -1,1 +1,44 @@
-{"name":"@simulab/engine","version":"0.2.0","private":true,"type":"module","description":"Framework-independent SimuLab AVR instruction-emulation adapter","main":"./dist/index.js","types":"./dist/index.d.ts","exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},"files":["dist","README.md","THIRD_PARTY_NOTICES.md","docs/CONTRACTS.md"],"scripts":{"build":"tsc -p tsconfig.json","test":"vitest run"},"dependencies":{"avr8js":"0.21.1"},"devDependencies":{"typescript":"~5.9.3","vitest":"5.1.0","@types/node":"^24.0.0"}}
+{
+  "name": "@simulab/engine",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Framework-independent SimuLab AVR instruction-emulation adapter",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./esp32": {
+      "types": "./esp32/adapter.d.mts",
+      "import": "./esp32/adapter.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md",
+    "docs/CONTRACTS.md",
+    "esp32/adapter.mjs",
+    "esp32/adapter.d.mts",
+    "esp32/licenses",
+    "esp32/asset-manifest.json",
+    "esp32/README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:esp32": "node --test esp32/tests/adapter.test.mjs esp32/tests/bindings.test.mjs",
+    "test:esp32:firmware": "node esp32/tests/real-boot.mjs && node esp32/tests/real-gpio.mjs"
+  },
+  "dependencies": {
+    "avr8js": "0.21.1"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "5.1.0",
+    "@types/node": "^24.0.0"
+  }
+}

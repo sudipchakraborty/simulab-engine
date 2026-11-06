@@ -1,0 +1,38 @@
+{
+  "memory": {
+    "reportedFlashBytes": 4194304,
+    "freeGuestHeapBytes": 8311216
+  },
+  "diagnostics": {
+    "isXtensa": true,
+    "reportedHarts": 2,
+    "programCounters": [
+      1077421846,
+      1077421846
+    ],
+    "clockMHz": 240
+  },
+  "firmware": "MicroPython1.29.0 on real XtensaWASM",
+  "gpioOutputPassed": true,
+  "gpioInputPassed": true,
+  "blinkTransitions": [
+    {
+      "pin": "GPIO4",
+      "level": 1,
+      "cycle": 86709745
+    },
+    {
+      "pin": "GPIO4",
+      "level": 0,
+      "cycle": 146425540
+    },
+    {
+      "pin": "GPIO4",
+      "level": 1,
+      "cycle": 206142004
+    }
+  ],
+  "intervalMicros": 248815.8125,
+  "uart": "ESP-ROM:esp32s3-20210327\r\nBuild:Mar 27 2021\r\nrst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\nSPIWP:0xee\r\nmode:DIO, clock div:1\r\nload:0x3fce2820,len:0xeac\r\nload:0x403c8700,len:0xc28\r\nload:0x403cb700,len:0x2ff8\r\nentry 0x403c88ac\r\nPerforming initial setup\r\nMicroPython v1.29.0 on 2026-08-24; Generic ESP32S3 module with Octal-SPIRAM with ESP32-S3\r\nType \"help()\" for more information.\r\n>>> from machine import Pin; led=Pin(4,Pin.OUT); led.value(1); print('SIMULAB_HIGH')\r\nSIMULAB_HIGH\r\n>>> led.value(0); print('SIMULAB_LOW')\r\nSIMULAB_LOW\r\n>>> button=Pin(5,Pin.IN,Pin.PULL_UP); print('INPUT_READY')\r\nINPUT_READY\r\n>>> print('INPUT='+str(button.value()))\r\nINPUT=0\r\n>>> print('INPUT='+str(button.value()))\r\nINPUT=1\r\n>>> exec(\"try:\\n import esp,gc\\n print('MEMORY='+str(esp.flash_size())+','+str(gc.mem_free()))\\nexcept Exception as e:\\n print('MEMORY_UNAVAILABLE='+str(e))\\nprint('MEMORY_DONE')\")\r\nMEMORY=4194304,8311216\r\nMEMORY_DONE\r\n>>> exec(\"from machine import Timer\\ndef tick(timer):\\n led.value(1-led.value())\\n print('TICK'+str(led.value()))\\ntimer=Timer(0)\\ntimer.init(period=250,mode=Timer.PERIODIC,callback=tick)\\nprint('TIMER_READY')\")\r\nTIMER_READY\r\n>>> TICK1\r\nTICK0\r\nTICK1\r\n",
+  "hardwareComparison": false
+}
