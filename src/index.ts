@@ -1,4 +1,4 @@
-﻿export { UnoRuntime } from "./uno.js";
+export { UnoRuntime, AvrRuntime } from "./uno.js";
 export { parseIntelHex } from "./hex.js";
 export {
   RuntimeError,
@@ -15,3 +15,9 @@ export type {
 
 export { createMcuEngine } from "./mcu.js";
 export type { McuEngine, McuEngineOptions } from "./mcu.js";
+
+export type {UnoOptions} from './uno.js';
+
+export type {AvrOptions} from "./uno.js";
+export {avrProfile} from "./avrProfiles.js";
+export type {AvrChip} from "./avrProfiles.js";

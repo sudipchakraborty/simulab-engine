@@ -1,4 +1,4 @@
-﻿/** @brief Stable digital level; null means the MCU is not driving the pin. */
+/** @brief Stable digital level; null means the MCU is not driving the pin. */
 export type DigitalLevel = 0 | 1 | null;
 export type RuntimeState = "ready" | "running" | "paused" | "stopped";
 export interface GpioTransition {
@@ -36,11 +36,11 @@ export const capabilities = Object.freeze({
   firmwareFormats: ["intel-hex"],
   gpio: true,
   uartTx: true,
-  timers: [1],
-  unverifiedTimers: [0, 2],
-  pwm: false,
+  timers: [0, 1, 2],
+  unverifiedTimers: [],
+  pwm: true,
   i2c: false,
   spi: false,
   adc: false,
-  uartRx: false,
+  uartRx: true,
 });

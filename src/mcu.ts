@@ -1,4 +1,4 @@
-import { UnoRuntime } from "./uno.js";
+import { AvrRuntime } from "./uno.js";
 import {
   capabilities,
   type RuntimeSnapshot,
@@ -23,16 +23,16 @@ export interface McuEngine {
   dispose(): void;
 }
 export type McuEngineOptions =
-  { target: "atmega328p" } | { target: "esp32s3"; bindings: EspBindings };
+  { target: "atmega328p" | "atmega2560" } | { target: "esp32s3"; bindings: EspBindings };
 /** @brief Standard firmware/lifecycle/GPIO/UART facade; target and binding are explicit, never inferred from source text.
  * @details AVR batches count cycles; S3 batches count instructions. Query capabilities before scheduling.
  */
 export function createMcuEngine(options: McuEngineOptions): McuEngine {
-  if (options.target !== "atmega328p" && options.target !== "esp32s3")
+  if (!["atmega328p","atmega2560","esp32s3"].includes(options.target))
     throw new Error("Unsupported MCU target; no fallback is available.");
   if (options.target === "esp32s3" && !options.bindings?.WasmEmulator)
     throw new Error("Initialized official ESP32-S3 WASM binding required.");
-  let runtime: UnoRuntime | Esp32S3Runtime | undefined;
+  let runtime: AvrRuntime | Esp32S3Runtime | undefined;
   let last: RuntimeSnapshot | undefined;
   const gpioListeners = new Set<(event: GpioTransition) => void>(),
     uartListeners = new Set<(text: string) => void>();
@@ -44,10 +44,10 @@ export function createMcuEngine(options: McuEngineOptions): McuEngine {
   const engine: McuEngine = {
     loadFirmware(data) {
       if (runtime instanceof Esp32S3Runtime) runtime.dispose();
-      if (options.target === "atmega328p") {
+      if (options.target !== "esp32s3") {
         if (typeof data !== "string")
           throw new Error("ATmega328P requires Intel HEX text.");
-        runtime = new UnoRuntime(data);
+        runtime = new AvrRuntime(data,{mcu:options.target});
       } else {
         if (!(data instanceof Uint8Array))
           throw new Error("ESP32-S3 requires merged flash bytes.");
@@ -78,7 +78,7 @@ export function createMcuEngine(options: McuEngineOptions): McuEngine {
     runBatch(budget) {
       const r = requireRuntime();
       const result =
-        r instanceof UnoRuntime ? r.runCycles(budget) : r.runBatch(budget);
+        r instanceof AvrRuntime ? r.runCycles(budget) : r.runBatch(budget);
       for (const event of result.transitions)
         for (const listener of gpioListeners) listener(event);
       if (result.serial)
@@ -115,8 +115,8 @@ export function createMcuEngine(options: McuEngineOptions): McuEngine {
       return last!.timeMicros;
     },
     getCapabilities() {
-      return options.target === "atmega328p"
-        ? { ...capabilities, budgetUnit: "cycles" }
+      return options.target !== "esp32s3"
+        ? { ...capabilities, board:options.target==='atmega2560'?'arduino-mega2560':'arduino-uno-nano', mcu:options.target, timers:options.target==='atmega2560'?[0,1,2,3,4,5]:[0,1,2], unverifiedTimers:options.target==='atmega2560'?[2,3,4,5]:[], uartInstances:[0], budgetUnit: "cycles" }
         : runtime instanceof Esp32S3Runtime
           ? runtime.getCapabilities()
           : {

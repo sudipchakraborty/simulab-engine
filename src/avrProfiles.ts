@@ -1,0 +1,22 @@
+/** @file Explicit chip register, memory, vector and Arduino pin profiles.
+ * @details Mega pin map follows Arduino AVR core1.8.6 variants/mega/pins_arduino.h;
+ * vector numbers follow avr-libc iom2560.h. No CPU-family substitution occurs.
+ */
+import {portAConfig,portBConfig,portCConfig,portDConfig,portEConfig,portFConfig,portGConfig,portHConfig,portJConfig,portKConfig,portLConfig,timer0Config,timer1Config,timer2Config,usart0Config,twiConfig,type AVRPortConfig,type AVRTimerConfig} from 'avr8js';
+export type AvrChip='atmega328p'|'atmega2560';
+export type PinMap=Readonly<Record<string,readonly [string,number]>>;
+const unoMap=Object.fromEntries([...Array.from({length:8},(_,i)=>[`D${i}`,['D',i]]),...Array.from({length:6},(_,i)=>[`D${8+i}`,['B',i]]),...Array.from({length:6},(_,i)=>[`A${i}`,['C',i]])]) as unknown as PinMap;
+const digital:readonly (readonly [string,number])[]=[['E',0],['E',1],['E',4],['E',5],['G',5],['E',3],['H',3],['H',4],['H',5],['H',6],['B',4],['B',5],['B',6],['B',7],['J',1],['J',0],['H',1],['H',0],['D',3],['D',2],['D',1],['D',0],...Array.from({length:8},(_,i)=>['A',i] as const),...Array.from({length:8},(_,i)=>['C',7-i] as const),['D',7],['G',2],['G',1],['G',0],...Array.from({length:8},(_,i)=>['L',7-i] as const),['B',3],['B',2],['B',1],['B',0]];
+const megaMap=Object.fromEntries([...digital.map((p,i)=>[`D${i}`,p]),...Array.from({length:16},(_,i)=>[`A${i}`,[i<8?'F':'K',i%8]])]) as unknown as PinMap;
+const ext=(index:number)=>({EICR:index<4?0x69:0x6a,EIMSK:0x3d,EIFR:0x3c,index,iscOffset:(index%4)*2,interrupt:(index+1)*2});
+const pc=(index:number,mask=255,offset=0)=>({PCIE:index,PCICR:0x68,PCIFR:0x3b,PCMSK:0x6b+index,pinChangeInterrupt:(9+index)*2,mask,offset});
+const clean=(p:AVRPortConfig):AVRPortConfig=>({PIN:p.PIN,DDR:p.DDR,PORT:p.PORT,externalInterrupts:[]});
+const megaPorts:Record<string,AVRPortConfig>={A:clean(portAConfig),B:{...clean(portBConfig),pinChange:pc(0)},C:clean(portCConfig),D:{...clean(portDConfig),externalInterrupts:[ext(0),ext(1),ext(2),ext(3)]},E:{...clean(portEConfig),pinChange:pc(1,1),externalInterrupts:[null,null,null,null,ext(4),ext(5),ext(6),ext(7)]},F:clean(portFConfig),G:clean(portGConfig),H:clean(portHConfig),J:{...clean(portJConfig),pinChange:pc(1,0x7f,1)},K:{...clean(portKConfig),pinChange:pc(2)},L:clean(portLConfig)};
+const t1:AVRTimerConfig={...timer1Config,captureInterrupt:32,compAInterrupt:34,compBInterrupt:36,compCInterrupt:38,ovfInterrupt:40,OCRC:0x8c,OCFC:8,OCIEC:8,compPortA:portBConfig.PORT,compPinA:5,compPortB:portBConfig.PORT,compPinB:6,compPortC:portBConfig.PORT,compPinC:7,externalClockPort:portDConfig.PORT,externalClockPin:6};
+const timer16=(base:number,mask:number,flag:number,vector:number,port:number,pins:[number,number,number],extPort:number,extPin:number):AVRTimerConfig=>({...t1,TCCRA:base,TCCRB:base+1,TCCRC:base+2,TCNT:base+4,ICR:base+6,OCRA:base+8,OCRB:base+10,OCRC:base+12,TIMSK:mask,TIFR:flag,captureInterrupt:vector*2,compAInterrupt:(vector+1)*2,compBInterrupt:(vector+2)*2,compCInterrupt:(vector+3)*2,ovfInterrupt:(vector+4)*2,compPortA:port,compPortB:port,compPortC:port,compPinA:pins[0],compPinB:pins[1],compPinC:pins[2],externalClockPort:extPort,externalClockPin:extPin});
+/** @brief Return an explicit AVR hardware profile; unknown chips fail instead of using a fallback. */
+export function avrProfile(chip:AvrChip='atmega328p') {
+ if(chip==='atmega328p')return {chip,flashBytes:32768,sramAllocation:2048,pins:unoMap,ports:{B:portBConfig,C:portCConfig,D:portDConfig} as Record<string,AVRPortConfig>,timers:[timer0Config,timer1Config,timer2Config],uart:usart0Config,twi:twiConfig};
+ if(chip!=='atmega2560')throw new Error('Unsupported AVR chip profile');
+ return {chip,flashBytes:262144,sramAllocation:8192+0x100,pins:megaMap,ports:megaPorts,timers:[{...timer0Config,compAInterrupt:42,compBInterrupt:44,ovfInterrupt:46,compPortA:portBConfig.PORT,compPinA:7,compPortB:portGConfig.PORT,compPinB:5,externalClockPort:portDConfig.PORT,externalClockPin:7},t1,{...timer2Config,compAInterrupt:26,compBInterrupt:28,ovfInterrupt:30,compPortA:portBConfig.PORT,compPinA:4,compPortB:portHConfig.PORT,compPinB:6},timer16(0x90,0x71,0x38,31,portEConfig.PORT,[3,4,5],portEConfig.PORT,6),timer16(0xa0,0x72,0x39,41,portHConfig.PORT,[3,4,5],portHConfig.PORT,7),timer16(0x120,0x73,0x3a,46,portLConfig.PORT,[3,4,5],portLConfig.PORT,2)],uart:{...usart0Config,rxCompleteInterrupt:50,dataRegisterEmptyInterrupt:52,txCompleteInterrupt:54},twi:{...twiConfig,twiInterrupt:78}};
+}

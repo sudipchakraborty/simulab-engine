@@ -1,18 +1,20 @@
-﻿import { RuntimeError } from "./types.js";
+import { RuntimeError } from "./types.js";
 const fail = (message: string): never => {
   throw new RuntimeError("INVALID_FIRMWARE", message);
 };
-/** @brief Validate compiled Intel HEX and return an erased 32KiB ATmega328P flash image.
+/** @brief Validate compiled Intel HEX and return an erased explicitly selected AVR flash image.
  * @param hex ASCII Intel HEX; source code, ELF, bootloader/fuse records are not accepted.
  * @throws RuntimeError for malformed or out-of-range data.
  */
-export function parseIntelHex(hex: string): Uint8Array {
-  if (typeof hex !== "string" || hex.length > 131072 || !hex.trim())
-    fail("Firmware must contain at most 128KiB Intel HEX text.");
+export function parseIntelHex(hex: string, flashBytes=32768): Uint8Array {
+  if(![32768,262144].includes(flashBytes))fail('Unsupported AVR flash profile.');
+  const label=flashBytes===32768?'ATmega328P':'ATmega2560';
+  if (typeof hex !== "string" || hex.length > flashBytes*4 || !hex.trim())
+    fail(`Firmware must contain at most ${flashBytes*4} bytes of Intel HEX text.`);
   if (!/^[\x09\x0a\x0d\x20-\x7e]*$/.test(hex))
     fail("Firmware must use ASCII Intel HEX.");
-  const flash = new Uint8Array(32768).fill(0xff),
-    written = new Uint8Array(32768);
+  const flash = new Uint8Array(flashBytes).fill(0xff),
+    written = new Uint8Array(flashBytes);
   let base = 0,
     eof = false,
     dataBytes = 0;
@@ -39,7 +41,7 @@ export function parseIntelHex(hex: string): Uint8Array {
       if (!length) fail("Empty data records are not supported.");
       const start = base + address;
       if (start + length > flash.length)
-        fail("Firmware exceeds ATmega328P flash bounds.");
+        fail(`Firmware exceeds ${label} flash bounds.`);
       for (let i = 0; i < length; i++) {
         if (written[start + i]) fail("Overlapping firmware data.");
         flash[start + i] = bytes[4 + i];
@@ -54,7 +56,7 @@ export function parseIntelHex(hex: string): Uint8Array {
         fail("Invalid extended-address record.");
       base = ((bytes[4] << 8) | bytes[5]) * (type === 2 ? 16 : 65536);
       if (base >= flash.length)
-        fail("Extended address exceeds ATmega328P flash.");
+        fail(`Extended address exceeds ${label} flash.`);
     } else fail(`Unsupported Intel HEX record type ${type}.`);
   }
   if (!eof) fail("Missing Intel HEX EOF record.");

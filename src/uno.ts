@@ -1,3 +1,4 @@
+import {avrProfile,type AvrChip} from './avrProfiles.js';
 import {
   CPU,
   avrInstruction,
@@ -5,13 +6,7 @@ import {
   AVRTimer,
   AVRUSART,
   PinState,
-  portBConfig,
-  portCConfig,
-  portDConfig,
-  timer0Config,
-  timer1Config,
-  timer2Config,
-  usart0Config,
+  AVRTWI,
 } from "avr8js";
 import { parseIntelHex } from "./hex.js";
 import { isRecognizedOpcode } from "./opcodes.js";
@@ -23,18 +18,14 @@ import {
   type RuntimeState,
   type GpioTransition,
 } from "./types.js";
-const PIN_MAP: Readonly<Record<string, readonly [string, number]>> =
-  Object.freeze(
-    Object.fromEntries([
-      ...Array.from({ length: 8 }, (_, i) => [`D${i}`, ["D", i]]),
-      ...Array.from({ length: 6 }, (_, i) => [`D${i + 8}`, ["B", i]]),
-      ...Array.from({ length: 6 }, (_, i) => [`A${i}`, ["C", i]]),
-    ]),
-  ) as Record<string, readonly [string, number]>;
+/** @brief Inject an external I2C bus. Empty write probes an address; reads use the device register pointer. */
+export interface UnoOptions { onBeforeInputRead?:(timeMicros:number,gpio:Record<string,DigitalLevel>)=>void; onGpioTransition?:(event:GpioTransition,gpio:Record<string,DigitalLevel>)=>void; i2c?: {write(address:number,bytes:number[]):boolean;read(address:number,count:number):number[]} }
 /** @brief Real AVR CPU adapter, free from UI and host scheduling. Host supplies bounded cycle slices.
- * @param hex Compiled ATmega328P Intel HEX. The adapter never parses Arduino source functions.
+ * @param hex Compiled Intel HEX for the explicitly selected chip. The adapter never parses Arduino source functions.
  */
-export class UnoRuntime {
+export interface AvrOptions extends UnoOptions {mcu?:AvrChip}
+export class AvrRuntime {
+  private readonly profile:ReturnType<typeof avrProfile>;
   private readonly flash: Uint8Array;
   private cpu!: CPU;
   private ports!: Record<string, AVRIOPort>;
@@ -42,24 +33,37 @@ export class UnoRuntime {
   private serial = "";
   private transitions: GpioTransition[] = [];
   private levels: Record<string, DigitalLevel> = {};
-  constructor(hex: string) {
-    this.flash = parseIntelHex(hex);
+  private uart!: AVRUSART;
+  private rxQueue:number[]=[];
+  constructor(hex: string, private readonly options:AvrOptions = {}) {
+    this.profile=avrProfile(options.mcu);
+    this.flash = parseIntelHex(hex,this.profile.flashBytes);
     this.initialize();
   }
   private initialize(): void {
-    const words = new Uint16Array(16384);
+    const words = new Uint16Array(this.profile.flashBytes/2);
     for (let i = 0; i < words.length; i++)
       words[i] = this.flash[i * 2] | (this.flash[i * 2 + 1] << 8);
-    this.cpu = new CPU(words, 2048);
-    this.ports = {
-      B: new AVRIOPort(this.cpu, portBConfig),
-      C: new AVRIOPort(this.cpu, portCConfig),
-      D: new AVRIOPort(this.cpu, portDConfig),
+    this.cpu = new CPU(words, this.profile.sramAllocation);
+    this.ports=Object.fromEntries(Object.entries(this.profile.ports).map(([name,cfg])=>[name,new AVRIOPort(this.cpu,cfg)]));
+    // Resolve delayed external devices at the actual PIN-register read, not only at output edges.
+    for(const port of Object.values(this.ports)) {
+      const addr=port.portConfig.PIN;
+      this.cpu.readHooks[addr]=()=>{this.options.onBeforeInputRead?.(this.cpu.cycles/16,this.readLevels());return this.cpu.data[addr];};
+    }
+    for(const cfg of this.profile.timers)new AVRTimer(this.cpu,cfg);
+    const uart = new AVRUSART(this.cpu, this.profile.uart, UNO_CLOCK_HZ);
+    this.uart=uart;this.rxQueue=[];
+    const twi=new AVRTWI(this.cpu,this.profile.twi,UNO_CLOCK_HZ);
+    let address=0,bytes:number[]=[];
+    const syncBus=()=>this.options.onBeforeInputRead?.(this.cpu.cycles/16,this.readLevels());
+    twi.eventHandler={
+      start:()=>{bytes=[];twi.completeStart();},
+      stop:()=>{bytes=[];twi.completeStop();},
+      connectToSlave:(addr)=>{syncBus();address=addr;bytes=[];twi.completeConnect(this.options.i2c?.write(addr,[])??false);},
+      writeByte:(value)=>{syncBus();bytes.push(value);twi.completeWrite(this.options.i2c?.write(address,bytes)??false);},
+      readByte:()=>{syncBus();twi.completeRead(this.options.i2c?.read(address,1)[0]??255);},
     };
-    new AVRTimer(this.cpu, timer0Config);
-    new AVRTimer(this.cpu, timer1Config);
-    new AVRTimer(this.cpu, timer2Config);
-    const uart = new AVRUSART(this.cpu, usart0Config, UNO_CLOCK_HZ);
     uart.onByteTransmit = (byte: number) => {
       if (this.serial.length >= 4096)
         throw new RuntimeError(
@@ -77,7 +81,7 @@ export class UnoRuntime {
   }
   private readLevels(): Record<string, DigitalLevel> {
     const result: Record<string, DigitalLevel> = {};
-    for (const [pin, [port, bit]] of Object.entries(PIN_MAP)) {
+    for (const [pin, [port, bit]] of Object.entries(this.profile.pins)) {
       const state = this.ports[port].pinState(bit);
       result[pin] =
         state === PinState.High ? 1 : state === PinState.Low ? 0 : null;
@@ -86,6 +90,7 @@ export class UnoRuntime {
   }
   private captureTransitions(): void {
     const now = this.readLevels();
+    const pending:GpioTransition[]=[];
     for (const pin of Object.keys(now)) {
       if (now[pin] !== this.levels[pin]) {
         if (this.transitions.length >= 4096)
@@ -93,10 +98,12 @@ export class UnoRuntime {
             "OUTPUT_LIMIT",
             "GPIO output exceeds 4096-transition batch limit.",
           );
-        this.transitions.push({ pin, level: now[pin], cycle: this.cpu.cycles });
+        const event={ pin, level: now[pin], cycle: this.cpu.cycles };
+        this.transitions.push(event);pending.push(event);
       }
     }
     this.levels = now;
+    for(const event of pending)this.options.onGpioTransition?.(event,now);
   }
   /** @brief Begin a loaded CPU; restarting a stopped CPU initializes fresh power-on state. */
   start(): void {
@@ -133,13 +140,21 @@ export class UnoRuntime {
   }
   /** @brief Apply an external digital input, including interrupt-enabled pins. Output pins remain MCU-driven. */
   setPin(pin: string, value: boolean): void {
-    if (typeof value !== "boolean" || !Object.hasOwn(PIN_MAP, pin))
+    if (typeof value !== "boolean" || !Object.hasOwn(this.profile.pins, pin))
       throw new RuntimeError(
         "INVALID_INPUT",
         "Expected a Uno digital pin and boolean input.",
       );
-    const [port, bit] = PIN_MAP[pin];
+    const [port, bit] = this.profile.pins[pin];
     this.ports[port].setPin(bit, value);
+  }
+  /** @brief Apply a resolved external digital level. Floating inputs use the AVR pull-up state (otherwise deterministic LOW).
+   * @details This fallback does not establish a physically valid floating voltage; the circuit host reports ambiguity.
+   */
+  setPinLevel(pin:string,level:DigitalLevel):void {
+    if(!this.profile.pins[pin])throw new RuntimeError('INVALID_PIN','Unknown AVR pin');
+    const [port,bit]=this.profile.pins[pin];
+    this.setPin(pin,level===null?this.ports[port].pinState(bit)===PinState.InputPullUp:level===1);
   }
   /** @brief Execute real instructions until cycle budget is reached; one instruction can cross the boundary. */
   runCycles(budget: number): RuntimeSnapshot {
@@ -169,6 +184,9 @@ export class UnoRuntime {
           );
         avrInstruction(this.cpu);
         this.cpu.tick();
+        if(this.rxQueue.length&&this.uart.rxEnable&&!this.uart.rxBusy) {
+          if(this.uart.writeByte(this.rxQueue[0]))this.rxQueue.shift();
+        }
       }
     } catch (error) {
       this.state = "stopped";
@@ -179,6 +197,18 @@ export class UnoRuntime {
       );
     }
     return this.snapshot();
+  }
+  /** @brief Queue bounded external UART bytes for the real AVR USART peripheral. */
+  uartInput(bytes:Uint8Array):void {
+    if(!(bytes instanceof Uint8Array)||this.rxQueue.length+bytes.length>4096)throw new RuntimeError('INPUT_LIMIT','UART input exceeds 4096 bytes');
+    this.rxQueue.push(...bytes);
+  }
+  /** @brief Inspect real CPU registers. PC is a byte address; no source mapping is implied. */
+  debugSnapshot() {return {pcBytes:this.cpu.pc*2,sp:this.cpu.dataView.getUint16(0x5d,true),sreg:this.cpu.data[0x5f],registers:Array.from(this.cpu.data.slice(0,32))};}
+  /** @brief Execute exactly one real instruction from ready/paused state. */
+  stepInstruction() {
+    if(!['ready','paused'].includes(this.state))throw new RuntimeError('INVALID_STATE','Pause before stepping');
+    this.state='running';const s=this.runCycles(1);this.state='paused';s.state='paused';return s;
   }
   /** @brief Read current cycle-derived state, draining bounded event and UART batches. */
   snapshot(): RuntimeSnapshot {
@@ -195,3 +225,6 @@ export class UnoRuntime {
     return result;
   }
 }
+
+/** @brief Backward-compatible explicit ATmega328P runtime; Mega uses AvrRuntime with its own profile. */
+export class UnoRuntime extends AvrRuntime {constructor(hex:string,options:UnoOptions={}){super(hex,{...options,mcu:"atmega328p"});}}

@@ -1,0 +1,16 @@
+{
+  "firmware": "D:\\PROJECTS\\Simulab\\simulab-backend\\.local\\verification\\31f9006c7c332e3764384cee6304dba6\\output\\sketch.ino.merged.bin",
+  "kind": "actual Arduino CLI compiled S3 firmware",
+  "firmwareSha256": "b25396d2c4440fc3d54716c03451ee4a386fa07dc5979b049f4559afe564a78a",
+  "physicalHardwareComparison": false,
+  "passed": true,
+  "serial": "ESP-ROM:esp32s3-20210327\r\nBuild:Mar 27 2021\r\nrst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)\r\nSPIWP:0xee\r\nmode:DIO, clock div:1\r\nload:0x3fce2820,len:0x10cc\r\nload:0x403c8700,len:0xc2c\r\nload:0x403cb700,len:0x30c0\r\nentry 0x403c88b8\r\nSIMULAB COMPILED S3\r\n",
+  "gpio4Levels": [
+    1,
+    0
+  ],
+  "error": "",
+  "cycles": 63170593,
+  "timeMicros": 263210.80416666664,
+  "wallMs": 231
+}
