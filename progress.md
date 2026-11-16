@@ -78,3 +78,9 @@
 - User explicitly requested checking, committing and pushing all3 repositories. Publishing current feature/components-ide branch to origin; main is preserved.
 - Fresh engine gates passed:21 AVR/runtime tests,5 ESP adapter tests, strict TypeScript build, production dependency audit0vulnerabilities. Intentional compiled C/HEX/ELF test fixtures/provenance remain versioned; toolchain caches and runtime outputs remain ignored.
 - Candidate source/docs/fixtures audit found no private keys, GitHub tokens, live companion token or credential-bearing URLs. Repo branch/remotes were fetched and reviewed. Existing physical hardware and unsupported peripheral limits remain documented; no hardware operation or deployment performed.
+
+## 2026-11-17 - Release verification and publication
+- User requested checking, committing and pushing the SimuLab workspace. Engine source was clean at `e764d73`; publishing the verification record on the existing `feature/components-ide` branch to `origin`.
+- Fresh checks passed: `npm.cmd test` (21/21 across 6 files), `npm.cmd run build`, `npm.cmd run test:esp32` (5/5), `npm.cmd run test:esp32:firmware`, `npm.cmd audit --omit=dev --audit-level=high` (0 vulnerabilities), and `git diff --check`.
+- Actual S3 Xtensa/WASM booted MicroPython 1.29.0 and exercised UART, GPIO4 output, GPIO5 input and the timer (248815.8125 microseconds). AVR/Mega tests executed the existing compiled fixtures; no firmware rebuild or physical-board test was performed.
+- Restored the generated boot-report wall-clock timing change after verification; emulator assets, firmware provenance and runtime behavior are unchanged. Final publication requires matching local/remote hashes, clean status and zero ahead/behind counts.
